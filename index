@@ -1,0 +1,134 @@
+<!doctype html>
+<html lang="zh">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1">
+<title>万福吉祥 · 临时进课堂</title>
+<meta name="robots" content="noindex">
+<style>
+  :root { --deep: #2E6DA4; --ink: #1F2A37; --ink2: #5F6B78; --line: #D4DCE6; --bg: #EAF1F8; }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--ink); font-family: -apple-system, "PingFang SC", "Noto Sans CJK SC", "Segoe UI", sans-serif; font-size: 17px; line-height: 1.5; }
+  header { background: var(--deep); color: #fff; padding: 18px 16px 14px; }
+  header .t { font-size: 22px; font-weight: 700; display: flex; justify-content: space-between; align-items: center; }
+  header .n { font-size: 16px; margin-top: 6px; opacity: .95; }
+  #lang { font-size: 16px; border: 1px solid rgba(255,255,255,.6); color: #fff; background: none; border-radius: 16px; padding: 3px 12px; }
+  main { padding: 12px 16px 40px; max-width: 480px; margin: 0 auto; }
+  .card { background: #fff; border: 1px solid var(--line); border-radius: 14px; padding: 16px; }
+  h1 { font-size: 19px; margin: 0 0 6px; }
+  label { display: block; font-size: 16px; color: var(--ink2); margin: 12px 0 4px; }
+  select, input { width: 100%; height: 48px; font-size: 18px; border: 1px solid var(--line); border-radius: 10px; padding: 0 10px; background: #fff; color: var(--ink); }
+  .row { display: flex; gap: 8px; } .row > * { flex: 1; min-width: 0; }
+  button.primary { width: 100%; height: 52px; margin-top: 14px; font-size: 18px; font-weight: 700; border: none; border-radius: 12px; background: #C28A3D; color: #3A2408; }
+  button.primary:disabled, .grey { background: #C9CFD6 !important; color: #5F6B78 !important; }
+  .yt { display: flex; align-items: center; justify-content: center; height: 58px; margin-top: 14px; border-radius: 12px; background: #D93025; color: #fff; text-decoration: none; font-size: 19px; font-weight: 700; }
+  .ok { background: #E8F5E1; color: #2F6B1F; border-radius: 10px; padding: 10px; text-align: center; font-weight: 600; margin-top: 12px; }
+  .warn { background: #FFF6E5; border: 1px solid #F0D49B; color: #6B4A10; border-radius: 10px; padding: 10px 12px; margin-top: 12px; font-size: 16px; }
+  .bad { background: #FDECEA; border: 1px solid #F2B8B0; color: #8A2A1E; border-radius: 10px; padding: 10px 12px; margin-top: 12px; font-size: 16px; }
+  .small { font-size: 16px; color: var(--ink2); }
+  .dim { position: fixed; inset: 0; background: rgba(20,30,40,.45); display: none; align-items: flex-end; z-index: 5; }
+  .dim.on { display: flex; }
+  .sheet { background: #fff; width: 100%; border-radius: 18px 18px 0 0; padding: 20px 16px 28px; max-width: 480px; margin: 0 auto; }
+  .sheet b { font-size: 19px; }
+  .two { display: flex; gap: 10px; margin-top: 16px; } .two button { flex: 1; height: 52px; font-size: 18px; font-weight: 700; border-radius: 12px; background: #fff; color: var(--deep); border: 1.5px solid var(--deep); }
+  .hidden { display: none; }
+</style>
+</head>
+<body>
+<header><div class="t"><span>万福吉祥</span><button id="lang" type="button">EN</button></div><div class="n" id="sub">掌中解脱 · 临时进课堂</div></header>
+<main>
+  <div class="card" id="box"><div class="small" data-t="loading">载入中…</div></div>
+</main>
+<div class="dim" id="dim"><div class="sheet" id="sheet"></div></div>
+<script>
+// ── the same Supabase project as the portal (public key; every call below is checked on the server) ──
+const SUPABASE_URL = 'https://bwwbgxngnxcwowyxkumh.supabase.co';
+const SUPABASE_KEY = 'sb_publishable_uHBSfGbk1MKC9ko24OifEQ_o4iRRHA2';
+const PORTAL = 'bwm.sg/sgmyzz';
+const COURSE_CODE = new URLSearchParams(location.search).get('c') || null;   // optional ?c=CODE; default = newest course
+const COUNTRIES = [['65', '新加坡', 'Singapore', 8], ['60', '马来西亚', 'Malaysia', 0], ['673', '汶莱', 'Brunei', 7], ['62', '印尼', 'Indonesia', 0], ['66', '泰国', 'Thailand', 9], ['other', '其他', 'Other', 0]];
+let lang = localStorage.getItem('bwm_lang') || 'zh', info = null, phone = '', found = null;
+const T = {
+  sub: ['掌中解脱 · 临时进课堂', 'Liberation in the Palm · backup entry'], loading: ['载入中…', 'Loading…'],
+  tonight: ['今晚 {t} 上课', 'Class tonight at {t}'], next: ['下一堂：{d} {t}', 'Next class: {d} {t}'], none: ['目前没有即将开始的课。', 'No upcoming class right now.'],
+  opens: ['{t} 开放', 'Opens at {t}'], phone: ['报名用的手机号码', 'Phone number used at registration'], cont: ['继续', 'Continue'],
+  note: ['网站打不开时用。这里只有 YouTube 直播。', 'For when the portal won’t open. YouTube live only.'],
+  confirm: ['您是 {n} 吗？', 'Are you {n}?'], yes: ['是', 'Yes'], no: ['不是', 'No'],
+  notfound: ['找不到这个号码的报名。请确认是报名时用的号码，或 WhatsApp 义工。', 'No registration found for this number. Check it is the number you registered with, or WhatsApp a volunteer.'],
+  notlive: ['现在不是上课时间。', 'Class is not on right now.'], noyt: ['这一堂还没有 YouTube 链接，请看 WhatsApp 群。', 'No YouTube link for this class yet — please check the WhatsApp group.'],
+  offline: ['暂时无法连线。请看 WhatsApp 群里的直播链接。', 'Can’t connect right now. Please use the live link in the WhatsApp group.'],
+  hi: ['{n}，您好 🙏', 'Hello, {n} 🙏'], done: ['✓ 已点名 · {t}', '✓ Checked in · {t}'], yt: ['▶ YouTube 直播', '▶ YouTube live'],
+  warn: ['您这次没有输入密码。网站恢复后，请照常用密码登入 {p}。', 'You joined without your password. Once the portal is back, log in as usual at {p}.'],
+  e_phone: ['请输入手机号码。', 'Please enter your phone number.'], e_len: ['号码位数不对，请再看看。', 'That doesn’t look like a full number — please check.'],
+};
+const t = (k, v = {}) => (T[k] ? T[k][lang === 'en' ? 1 : 0] : k).replace(/\{(\w+)\}/g, (m, x) => v[x] ?? m);
+const esc = s => String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+const $ = id => document.getElementById(id);
+const TZ = 'Asia/Singapore';
+const sg = d => new Date(new Date(d).toLocaleString('en-US', { timeZone: TZ }));
+const timeOnly = d => { const x = sg(d), h = x.getHours(); return `${h % 12 || 12}:${String(x.getMinutes()).padStart(2, '0')} ${h < 12 ? 'AM' : 'PM'}`; };
+const dmy = d => { const x = sg(d); return `${String(x.getDate()).padStart(2, '0')}/${String(x.getMonth() + 1).padStart(2, '0')}/${x.getFullYear()}`; };
+async function rpc(name, args) {
+  const r = await fetch(`${SUPABASE_URL}/rest/v1/rpc/${name}`, { method: 'POST', headers: { 'Content-Type': 'application/json', apikey: SUPABASE_KEY, Authorization: 'Bearer ' + SUPABASE_KEY }, body: JSON.stringify(args || {}) });
+  if (!r.ok) { let m = ''; try { m = (await r.json()).message || ''; } catch {} const e = new Error(m || ('HTTP ' + r.status)); e.status = r.status; throw e; }
+  return r.json();
+}
+function nameOf(d) { return (lang === 'en' ? (d.name_en || d.name_zh) : (d.name_zh || d.name_en)) || ''; }
+function render() {
+  $('sub').textContent = t('sub'); $('lang').textContent = lang === 'zh' ? 'EN' : '中'; document.documentElement.lang = lang;
+  const box = $('box');
+  if (info === undefined) { box.innerHTML = `<div class="bad">${t('offline')}</div>`; return; }
+  if (!info) { box.innerHTML = `<div class="small">${t('loading')}</div>`; return; }
+  if (!info.found || !info.session_id) { box.innerHTML = `<h1>${t('none')}</h1>`; return; }
+  const live = info.live, head = live ? t('tonight', { t: timeOnly(info.starts_at) }) : t('next', { d: dmy(info.starts_at), t: timeOnly(info.starts_at) });
+  const ccOpts = COUNTRIES.map(c => `<option value="${c[0]}" ${c[0] === (window._cc || '65') ? 'selected' : ''}>${lang === 'en' ? c[2] : c[1]} ${c[0] === 'other' ? '' : '+' + c[0]}</option>`).join('');
+  box.innerHTML = `<h1>${esc(head)}</h1>
+    <label>${t('phone')}</label>
+    <div class="row"><select id="cc" onchange="window._cc=this.value;$('cc-other').classList.toggle('hidden', this.value !== 'other')">${ccOpts}</select><input id="num" type="tel" inputmode="numeric" autocomplete="tel" value="${esc(window._num || '')}" oninput="window._num=this.value"></div>
+    <input id="cc-other" class="${(window._cc || '65') === 'other' ? '' : 'hidden'}" type="tel" inputmode="numeric" placeholder="${lang === 'en' ? 'Country code' : '国家代码'}" style="margin-top:8px">
+    <button class="primary" id="go" ${live ? '' : 'disabled'} onclick="go()">${live ? t('cont') : t('opens', { t: timeOnly(info.opens_at) })}</button>
+    <div id="msg"></div>
+    <p class="small" style="margin:12px 0 0">${t('note')}</p>`;
+}
+function normalise() {
+  let cc = $('cc').value; if (cc === 'other') cc = ($('cc-other').value || '').replace(/\D/g, '');
+  let n = ($('num').value || '').replace(/\D/g, ''); if (cc === '60' && n.startsWith('0')) n = n.slice(1);
+  if (!cc || !n) return { err: t('e_phone') };
+  const c = COUNTRIES.find(x => x[0] === cc); if (c && c[3] && n.length !== c[3]) return { err: t('e_len') };
+  if (n.length < 7 || n.length > 12) return { err: t('e_len') };
+  return { phone: '+' + cc + n };
+}
+async function go() {
+  const r = normalise(); $('msg').innerHTML = ''; if (r.err) { $('msg').innerHTML = `<div class="bad">${esc(r.err)}</div>`; return; }
+  phone = r.phone; $('go').disabled = true;
+  try {
+    found = await rpc('nopass_state', { p_phone: phone });
+    if (!found.found) $('msg').innerHTML = `<div class="bad">${t('notfound')}</div>`;
+    else if (!found.live) $('msg').innerHTML = `<div class="bad">${t('notlive')}</div>`;
+    else if (!found.has_youtube) $('msg').innerHTML = `<div class="bad">${t('noyt')}</div>`;
+    else confirmSheet();
+  } catch (e) { $('msg').innerHTML = `<div class="bad">${t('offline')}</div>`; }
+  $('go').disabled = false;
+}
+function confirmSheet() {
+  $('sheet').innerHTML = `<b>${esc(t('confirm', { n: nameOf(found) }))}</b><div class="small" style="margin-top:4px">${esc(phone.slice(0, 3))} •••• ${esc(phone.slice(-4))}</div>
+    <div class="two"><button type="button" onclick="yes()">${t('yes')}</button><button type="button" onclick="$('dim').classList.remove('on');$('num').focus()">${t('no')}</button></div>`;
+  $('dim').classList.add('on');
+}
+async function yes() {
+  $('dim').classList.remove('on');
+  let win = null; try { win = window.open('', '_blank'); } catch {}   // opened inside the tap, so phones allow it
+  try {
+    const d = await rpc('nopass_checkin', { p_phone: phone, p_via: 'backup' });
+    if (win) { try { win.location.href = d.youtube; } catch {} } else { try { window.open(d.youtube, '_blank', 'noopener'); } catch {} }
+    $('box').innerHTML = `<h1>${esc(t('hi', { n: nameOf(d) }))}</h1><div class="ok">${esc(t('done', { t: timeOnly(d.checked_in_at) }))}</div>
+      <a class="yt" href="${esc(d.youtube)}" target="_blank" rel="noopener">${t('yt')}</a>
+      <div class="warn">${esc(t('warn', { p: PORTAL }))}</div>`;
+  } catch (e) { try { win && win.close(); } catch {} $('msg').innerHTML = `<div class="bad">${t(/no youtube/.test(e.message) ? 'noyt' : /no class/.test(e.message) ? 'notlive' : 'offline')}</div>`; }
+}
+$('lang').onclick = () => { lang = lang === 'zh' ? 'en' : 'zh'; localStorage.setItem('bwm_lang', lang); render(); };
+(async () => { render(); try { info = await rpc('backup_info', { p_code: COURSE_CODE }); } catch (e) { info = undefined; } render();
+  setInterval(async () => { if (info && !info.live) { try { info = await rpc('backup_info', { p_code: COURSE_CODE }); render(); } catch {} } }, 60000); })();   // before 8 PM: check once a minute so the button turns on by itself
+</script>
+</body>
+</html>
